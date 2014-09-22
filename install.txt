@@ -1,0 +1,87 @@
+### ### ### PLITC ### ### ###
+#
+# --- booting FreeBSD LiveCD - choose Live Mode
+
+# --- change keymap
+
+kbdmap
+
+-> Keymap -> german.iso.acc.kbd
+
+# --- delete old partitions
+
+gpart delete -i 4 ada0
+gpart delete -i 3 ada0
+gpart delete -i 2 ada0
+gpart delete -i 1 ada0
+gpart destroy ada0
+
+# --- prepare
+
+sysctl kern.disks
+
+gpart create -s gpt ada0
+
+gpart add -t freebsd-boot -s 512k -a 4k ada0
+gpart add -t freebsd-ufs -l bootfs -s 1g -a 1m ada0
+gpart add -t freebsd-ufs -l cryptswap -s 4g -a 1m ada0
+gpart add -t freebsd-ufs -l cryptroot -a 1m ada0
+
+gpart bootcode -b /boot/pmbr -p /boot/gptboot -i 1 ada0
+
+geli init -b -s 4096 ada0p3
+geli init -b -s 4096 ada0p4
+
+geli attach ada0p3
+geli attach ada0p4
+
+newfs -U /dev/ada0p2
+newfs -U /dev/ada0p3.eli
+newfs -U /dev/ada0p4.eli
+
+mount /dev/ada0p4.eli /mnt
+mkdir /mnt/unenc
+mount /dev/ada0p2 /mnt/unenc
+### - mkdir /mnt/unenc/boot
+
+# --- system install
+
+cd /mnt
+/bin/sh
+for i in $(ls /usr/freebsd-dist/*.txz); do tar xf $i; done
+mv /mnt/boot /mnt/unenc
+ln -s unenc/boot /mnt/boot
+
+# --- system config
+
+chroot /mnt
+
+
+vi /etc/fstab
+# Device        Mountpoint      FStype  Options      Dump    Pass#
+/dev/ada0p2     /unenc          ufs     rw,noatime      1       1
+/dev/ada0p3.eli none            swap    sw              0       0
+/dev/ada0p4.eli /               ufs     rw,noatime      2       2
+
+
+vi /boot/loader.conf
+geom_eli_load="YES"
+vfs.root.mountfrom="ufs:ada0p4.eli"
+
+
+passwd
+
+cd /etc/mail
+make aliases
+
+exit; exit
+
+reboot
+
+### --- --- --- that’s it --- --- --- ###
+
+#
+### ### ### PLITC ### ### ###
+# EOF
+
+Done.
